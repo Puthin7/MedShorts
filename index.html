@@ -11,6 +11,22 @@
   <div><div class="eyebrow">PERSONAL MEDICAL KNOWLEDGE BASE</div><h1>MedShorts <span>✳</span></h1><p>Save the video. Keep the learning. Recall it later.</p></div>
   <div class="top-actions"><button id="exportBtn" class="secondary">Export backup</button><label class="button secondary">Import backup<input id="importFile" type="file" accept=".json,application/json" hidden></label></div>
 </header>
+<section class="cloud-panel" aria-label="Cloud sync">
+  <div class="cloud-heading"><div><h2>Cloud sync</h2><p id="cloudStatus">Not connected. Configure Supabase to sync across devices.</p></div><span id="cloudBadge" class="cloud-badge">Local only</span></div>
+  <details id="cloudSettings"><summary>Configure Supabase</summary>
+    <div class="cloud-fields">
+      <label>Project URL<input id="supabaseUrl" type="url" placeholder="https://your-project.supabase.co" autocomplete="url"></label>
+      <label>Publishable key<input id="supabaseKey" type="password" placeholder="sb_publishable_…" autocomplete="off"></label>
+    </div>
+    <p class="small">Use only your Supabase Project URL and publishable/legacy anon key. Never use a service_role or secret key. These settings are stored in this browser.</p>
+    <button id="saveConfigBtn" type="button">Save connection settings</button>
+  </details>
+  <div class="cloud-auth">
+    <label>Email<input id="authEmail" type="email" placeholder="you@example.com" autocomplete="username"></label>
+    <label>Password<input id="authPassword" type="password" placeholder="At least 6 characters" autocomplete="current-password"></label>
+    <div class="cloud-actions"><button id="signUpBtn" type="button" class="secondary">Create account</button><button id="signInBtn" type="button">Sign in</button><button id="signOutBtn" type="button" class="secondary hidden">Sign out</button><button id="syncBtn" type="button" disabled>Sync now</button></div>
+  </div>
+</section>
 <main>
   <section class="stats">
     <article><span>Total videos</span><strong id="totalCount">0</strong></article>
@@ -68,5 +84,6 @@
 </form>
 </dialog>
 <footer>MedShorts • Your knowledge, organized • Back up your data regularly</footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
 </body></html>

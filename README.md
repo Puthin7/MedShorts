@@ -40,3 +40,13 @@ Medicine, Surgery, Obstetrics & Gynaecology, Pediatrics, Ophthalmology, ENT, Com
 
 ## Medical safety
 This is a personal learning organizer, not a clinical decision-support system. AI-generated summaries may be wrong or incomplete. Verify treatment recommendations, drug doses, emergency algorithms, diagnostic cutoffs, and current guidelines against authoritative sources. Do not store patient-identifiable information here.
+
+
+## Supabase cloud sync edition
+
+1. In Supabase, run the SQL table and row-level security policies supplied in the setup instructions.
+2. In the live MedShorts app, open **Configure Supabase**, enter your Project URL and publishable key (or legacy anon key), then save. These values are stored in that browser's local storage.
+3. Create an account with email and password or sign in. If email confirmation is enabled, confirm your email first.
+4. Press **Sync now** on each device. The first sync merges local and cloud records by entry ID and latest updated timestamp. Deletions are stored as tombstones and sync as well.
+
+Never use a Supabase `service_role` or secret key in this static website. The publishable/anon key is not a secret; the table's RLS policies are the access control. Keep JSON exports as backups.

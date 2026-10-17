@@ -1,22 +1,26 @@
 (() => {
 const $ = id => document.getElementById(id);
 const DB_KEY = "medshorts-library-v1";
+const CONFIG_KEY = "medshorts-supabase-config-v1";
 let entries = [];
+let supabaseClient = null;
+let currentUser = null;
 const fields = ["title","url","subject","topic","creator","priority","status","reviewDate","takeaway","keyPoints","reasoning","pearls","questions","source","tags"];
 const today = () => new Date().toISOString().slice(0,10);
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now()+"-"+Math.random().toString(16).slice(2));
 function load(){try{entries=JSON.parse(localStorage.getItem(DB_KEY)||"[]");if(!Array.isArray(entries))entries=[];}catch{entries=[];}render();}
 function persist(){localStorage.setItem(DB_KEY,JSON.stringify(entries));render();}
+function activeEntries(){return entries.filter(e=>!e._deleted);}
 function escapeHtml(s=""){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function due(e){return e.reviewDate && e.reviewDate<=today() && e.status!=="Reviewed";}
 function render(){
- const q=$("search").value.toLowerCase().trim(), sub=$("subjectFilter").value, st=$("statusFilter").value;
- $("totalCount").textContent=entries.length;$("inboxCount").textContent=entries.filter(e=>e.status==="Inbox").length;
- $("dueCount").textContent=entries.filter(due).length;$("reviewedCount").textContent=entries.filter(e=>e.status==="Reviewed").length;
- const subjects=[...new Set(entries.map(e=>e.subject).filter(Boolean))].sort(), old=$("subjectFilter").value;
+ const live=activeEntries(); const q=$("search").value.toLowerCase().trim(), st=$("statusFilter").value;
+ $("totalCount").textContent=live.length;$("inboxCount").textContent=live.filter(e=>e.status==="Inbox").length;
+ $("dueCount").textContent=live.filter(due).length;$("reviewedCount").textContent=live.filter(e=>e.status==="Reviewed").length;
+ const subjects=[...new Set(live.map(e=>e.subject).filter(Boolean))].sort(), old=$("subjectFilter").value;
  $("subjectFilter").innerHTML='<option value="">All subjects</option>'+subjects.map(s=>`<option>${escapeHtml(s)}</option>`).join("");
  $("subjectFilter").value=subjects.includes(old)?old:"";
- const filtered=entries.filter(e=>(!q||fields.some(k=>String(e[k]||"").toLowerCase().includes(q)))&&(!$("subjectFilter").value||e.subject===$("subjectFilter").value)&&(!st||e.status===st)).sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));
+ const filtered=live.filter(e=>(!q||fields.some(k=>String(e[k]||"").toLowerCase().includes(q)))&&(!$("subjectFilter").value||e.subject===$("subjectFilter").value)&&(!st||e.status===st)).sort((a,b)=>(b.updatedAt||"").localeCompare(a.updatedAt||""));
  $("resultCount").textContent=`${filtered.length} entr${filtered.length===1?"y":"ies"}`;
  $("videoList").innerHTML=filtered.map(e=>`<article class="video-card">
  <div class="card-top"><div><h3 class="card-title">${escapeHtml(e.title||"Untitled video")}</h3><div class="meta">${escapeHtml(e.subject||"Other")}${e.topic?" · "+escapeHtml(e.topic):""}${e.creator?" · "+escapeHtml(e.creator):""}</div></div></div>
@@ -29,28 +33,40 @@ function render(){
  ${e.source?`<details><summary>Verification / source</summary><p>${escapeHtml(e.source).replace(/\n/g,"<br>")}</p></details>`:""}
  <div class="card-actions"><a href="${safeUrl(e.url)}" target="_blank" rel="noopener noreferrer">▶ Open video</a><button class="secondary" data-edit="${e.id}">Edit note</button><button class="secondary" data-review="${e.id}">Mark reviewed</button></div></article>`).join("");
  $("emptyState").classList.toggle("show",filtered.length===0);
- $("storageNote").textContent=`${entries.length} entries saved in this browser. Export JSON backups regularly.`;
+ $("storageNote").textContent=`${live.length} entries saved in this browser. ${currentUser?"Use Sync now to synchronize with your account.":"Export JSON backups regularly."}`;
 }
 function safeUrl(raw){try{const u=new URL(raw);return ["https:","http:"].includes(u.protocol)?escapeHtml(u.href):"#";}catch{return "#";}}
 function openEditor(e=null){
- $("videoForm").reset();$("entryId").value=e?.id||"";
- $("formTitle").textContent=e?"Edit video":"Add a Short";
- $("deleteBtn").classList.toggle("hidden",!e);
- fields.forEach(k=>{if($(k))$(k).value=e?.[k]||"";});
- if(!e){$("status").value="Inbox";$("priority").value="Medium";$("reviewDate").value="";}
- $("editor").showModal();
+ $("videoForm").reset();$("entryId").value=e?.id||"";$("formTitle").textContent=e?"Edit video":"Add a Short";
+ $("deleteBtn").classList.toggle("hidden",!e);fields.forEach(k=>{if($(k))$(k).value=e?.[k]||"";});
+ if(!e){$("status").value="Inbox";$("priority").value="Medium";$("reviewDate").value="";}$("editor").showModal();
 }
 $("newBtn").onclick=()=>openEditor();$("emptyAdd").onclick=()=>openEditor();$("closeModal").onclick=()=>$("editor").close();$("cancelBtn").onclick=()=>$("editor").close();
-$("videoForm").addEventListener("submit",ev=>{ev.preventDefault();const id=$("entryId").value||uid();const prior=entries.find(e=>e.id===id)||{};const obj={...prior,id,createdAt:prior.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};fields.forEach(k=>obj[k]=$(k).value.trim());if(!/^https?:\/\//i.test(obj.url)){alert("Please enter a valid http(s) YouTube URL.");return;}const idx=entries.findIndex(e=>e.id===id);if(idx>=0)entries[idx]=obj;else entries.unshift(obj);persist();$("editor").close();});
-$("deleteBtn").onclick=()=>{const id=$("entryId").value;if(id&&confirm("Delete this entry? Export a backup first if you may need it.")){entries=entries.filter(e=>e.id!==id);persist();$("editor").close();}};
+$("videoForm").addEventListener("submit",ev=>{ev.preventDefault();const id=$("entryId").value||uid();const prior=entries.find(e=>e.id===id)||{};const obj={...prior,id,_deleted:false,createdAt:prior.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};fields.forEach(k=>obj[k]=$(k).value.trim());if(!/^https?:\/\//i.test(obj.url)){alert("Please enter a valid http(s) YouTube URL.");return;}const idx=entries.findIndex(e=>e.id===id);if(idx>=0)entries[idx]=obj;else entries.unshift(obj);persist();$("editor").close();});
+$("deleteBtn").onclick=()=>{const id=$("entryId").value;if(id&&confirm("Delete this entry? The deletion will sync when you next press Sync now. Export a backup first if needed.")){const e=entries.find(x=>x.id===id);if(e){e._deleted=true;e.updatedAt=new Date().toISOString();persist();}$("editor").close();}};
 $("videoList").addEventListener("click",ev=>{const edit=ev.target.closest("[data-edit]"),rev=ev.target.closest("[data-review]");if(edit)openEditor(entries.find(e=>e.id===edit.dataset.edit));if(rev){const e=entries.find(x=>x.id===rev.dataset.review);if(e){e.status="Reviewed";e.updatedAt=new Date().toISOString();persist();}}});
 $("search").addEventListener("input",render);$("statusFilter").addEventListener("change",render);$("subjectFilter").addEventListener("change",render);
-$("exportBtn").onclick=()=>{const blob=new Blob([JSON.stringify({app:"MedShorts",version:1,exportedAt:new Date().toISOString(),entries},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="medshorts-backup-"+today()+".json";a.click();URL.revokeObjectURL(a.href);};
-$("importFile").onchange=async ev=>{const f=ev.target.files[0];if(!f)return;try{const data=JSON.parse(await f.text());const incoming=Array.isArray(data)?data:data.entries;if(!Array.isArray(incoming))throw Error("This file does not contain a MedShorts entry list.");if(!confirm(`Import ${incoming.length} entries? Existing entries with matching IDs will be replaced; other entries are retained.`))return;const map=new Map(entries.map(e=>[e.id,e]));incoming.forEach(e=>{if(e&&e.id)map.set(e.id,{...e});});entries=[...map.values()];persist();alert("Import complete.");}catch(err){alert("Import failed: "+err.message);}finally{ev.target.value="";}};
-$("sampleBtn").onclick=()=>{if(entries.length&&!confirm("Add example entries to your existing library?"))return;const samples=[
+$("exportBtn").onclick=()=>{const blob=new Blob([JSON.stringify({app:"MedShorts",version:2,exportedAt:new Date().toISOString(),entries},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="medshorts-backup-"+today()+".json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);};
+$("importFile").onchange=async ev=>{const f=ev.target.files[0];if(!f)return;try{const data=JSON.parse(await f.text());const incoming=Array.isArray(data)?data:data.entries;if(!Array.isArray(incoming))throw Error("This file does not contain a MedShorts entry list.");if(!confirm(`Import ${incoming.length} entries? Existing entries with matching IDs will be replaced; other entries are retained.`))return;const map=new Map(entries.map(e=>[e.id,e]));incoming.forEach(e=>{if(e&&e.id)map.set(e.id,{...e});});entries=[...map.values()];persist();alert("Import complete. Press Sync now if signed in to upload the merged library.");}catch(err){alert("Import failed: "+err.message);}finally{ev.target.value="";}};
+$("sampleBtn").onclick=()=>{if(activeEntries().length&&!confirm("Add example entries to your existing library?"))return;const samples=[
 {title:"Why JVP rises in cardiac tamponade",url:"https://www.youtube.com/",subject:"Medicine",topic:"Cardiology",creator:"Example entry",priority:"High",status:"To revise",reviewDate:today(),takeaway:"Impaired cardiac filling raises systemic venous pressure.",keyPoints:"Raised intrapericardial pressure limits diastolic filling.\nSystemic venous pressure rises and JVP becomes elevated.",reasoning:"The heart cannot expand normally during diastole, so venous return backs up. Interpret alongside clinical findings and haemodynamic context.",pearls:"Correlate with hypotension, tachycardia and other signs; do not diagnose from JVP alone.",questions:"Why does JVP rise?\nWhat other findings support tamponade?",source:"Example only — verify with a current medicine textbook or guideline.",tags:"cardiology,mechanism"},
 {title:"B12 versus folate deficiency",url:"https://www.youtube.com/",subject:"Medicine",topic:"Hematology",creator:"Example entry",priority:"High",status:"Inbox",reviewDate:"",takeaway:"Both can cause megaloblastic anemia; B12 deficiency may cause neurological manifestations.",keyPoints:"Macrocytosis and megaloblastic changes may occur in both.\nNeurological findings point toward B12 deficiency but require clinical assessment.",reasoning:"B12 is needed for methionine synthase and methylmalonyl-CoA mutase; folate participates in one-carbon transfer reactions.",pearls:"Confirm with appropriate investigations; interpret B12 and folate results in context.",questions:"Which metabolite rises in B12 deficiency but not isolated folate deficiency?\nWhy can folate treatment mask hematologic findings of B12 deficiency?",source:"Example only — verify with a current hematology reference.",tags:"hematology,high-yield"}];
-samples.forEach(s=>entries.unshift({...s,id:uid(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}));persist();};
+ samples.forEach(s=>entries.unshift({...s,id:uid(),_deleted:false,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}));persist();};
+function status(message,connected=false){$("cloudStatus").textContent=message;$("cloudBadge").textContent=connected?"Connected":"Local only";$("cloudBadge").classList.toggle("connected",connected);}
+function readConfig(){try{return JSON.parse(localStorage.getItem(CONFIG_KEY)||"{}");}catch{return {};}}
+function initSupabase(){const cfg=readConfig();$("supabaseUrl").value=cfg.url||"";$("supabaseKey").value=cfg.key||"";if(!cfg.url||!cfg.key){supabaseClient=null;status("Add your Project URL and publishable key under Configure Supabase.");return;}if(!window.supabase?.createClient){status("Supabase library did not load. Check your internet connection and reload.");return;}try{supabaseClient=window.supabase.createClient(cfg.url.trim().replace(/\/$/,""),cfg.key.trim());supabaseClient.auth.onAuthStateChange((_event,session)=>{currentUser=session?.user||null;updateAuthUI();});supabaseClient.auth.getSession().then(({data,error})=>{if(error)throw error;currentUser=data.session?.user||null;updateAuthUI();}).catch(e=>status("Auth check failed: "+e.message));}catch(e){supabaseClient=null;status("Could not initialize Supabase: "+e.message);}}
+function updateAuthUI(){const signed=!!currentUser;$("signUpBtn").classList.toggle("hidden",signed);$("signInBtn").classList.toggle("hidden",signed);$("signOutBtn").classList.toggle("hidden",!signed);$("syncBtn").disabled=!signed;status(signed?`Signed in as ${currentUser.email}. Press Sync now to merge this device with your cloud library.`:"Supabase configured. Sign in or create an account to sync.",signed);render();}
+$("saveConfigBtn").onclick=()=>{const url=$("supabaseUrl").value.trim().replace(/\/$/,""),key=$("supabaseKey").value.trim();if(!/^https:\/\/[a-zA-Z0-9-]+\.supabase\.co$/.test(url)){alert("Enter the exact HTTPS Project URL from Supabase, for example https://your-project.supabase.co");return;}if(!key){alert("Paste your publishable key (or legacy anon key), not a secret/service_role key.");return;}localStorage.setItem(CONFIG_KEY,JSON.stringify({url,key}));initSupabase();status("Settings saved. Sign in or create an account.");alert("Connection settings saved in this browser. Now create an account or sign in.");};
+async function authAction(action){if(!supabaseClient){alert("First open Configure Supabase, enter your Project URL and publishable key, and save settings.");return;}const email=$("authEmail").value.trim(),password=$("authPassword").value;if(!email||!password){alert("Enter your email and password.");return;}status("Working…");try{let result;if(action==="signup")result=await supabaseClient.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname}});else result=await supabaseClient.auth.signInWithPassword({email,password});if(result.error)throw result.error;if(action==="signup"&&!result.data.session){status("Account created. Check your email to confirm, then return here and sign in.");alert("Account created. If email confirmation is enabled, confirm your email before signing in.");}else{currentUser=result.data.user||result.data.session?.user||null;updateAuthUI();alert(action==="signup"?"Account created and signed in.":"Signed in successfully.");}}catch(e){status("Authentication failed: "+e.message);alert("Authentication failed: "+e.message);}}
+$("signUpBtn").onclick=()=>authAction("signup");$("signInBtn").onclick=()=>authAction("signin");$("signOutBtn").onclick=async()=>{if(!supabaseClient)return;const {error}=await supabaseClient.auth.signOut();if(error){alert(error.message);return;}currentUser=null;updateAuthUI();status("Signed out. Local notes remain on this device.");};
+$("syncBtn").onclick=async()=>{if(!supabaseClient||!currentUser){alert("Sign in before syncing.");return;}const btn=$("syncBtn");btn.disabled=true;btn.textContent="Syncing…";status("Syncing local and cloud entries…",true);try{
+ const {data:cloud,error:readErr}=await supabaseClient.from("medshorts_entries").select("id,data,updated_at").eq("user_id",currentUser.id);if(readErr)throw readErr;
+ const map=new Map();for(const row of (cloud||[])){if(row?.id&&row.data)map.set(row.id,{...row.data,id:row.id,updatedAt:row.data.updatedAt||row.updated_at});}
+ for(const local of entries){const remote=map.get(local.id);const lt=Date.parse(local.updatedAt||local.createdAt||0)||0,rt=Date.parse(remote?.updatedAt||0)||0;if(!remote||lt>=rt)map.set(local.id,{...local});}
+ const merged=[...map.values()];const rows=merged.map(e=>({user_id:currentUser.id,id:String(e.id),data:e,updated_at:e.updatedAt||new Date().toISOString()}));
+ for(let i=0;i<rows.length;i+=100){const {error}=await supabaseClient.from("medshorts_entries").upsert(rows.slice(i,i+100),{onConflict:"user_id,id"});if(error)throw error;}
+ entries=merged;localStorage.setItem(DB_KEY,JSON.stringify(entries));render();status(`Sync complete: ${activeEntries().length} active entries synchronized.`,true);alert(`Sync complete. ${activeEntries().length} active entries are now merged with your cloud library.`);
+ }catch(e){status("Sync failed: "+e.message,!!currentUser);alert("Sync failed: "+e.message+"\n\nCheck that the SQL table/policies were created, the Data API exposes this table, and you are signed in.");}finally{btn.disabled=!currentUser;btn.textContent="Sync now";}};
 if("serviceWorker" in navigator && location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js").catch(()=>{});
-load();
+load();initSupabase();
 })();
