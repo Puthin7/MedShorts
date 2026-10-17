@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#10231d"><title>MedShorts — Medical Knowledge Base</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div><div class="eyebrow">PERSONAL MEDICAL KNOWLEDGE BASE</div><h1>MedShorts <span>✳</span></h1><p>Save the video. Keep the learning. Recall it later.</p></div>
+  <div class="top-actions"><button id="exportBtn" class="secondary">Export backup</button><label class="button secondary">Import backup<input id="importFile" type="file" accept=".json,application/json" hidden></label></div>
+</header>
+<main>
+  <section class="stats">
+    <article><span>Total videos</span><strong id="totalCount">0</strong></article>
+    <article><span>To process</span><strong id="inboxCount">0</strong></article>
+    <article><span>Due to revise</span><strong id="dueCount">0</strong></article>
+    <article><span>Reviewed</span><strong id="reviewedCount">0</strong></article>
+  </section>
+  <section class="toolbar">
+    <input id="search" placeholder="Search title, topic, notes, creator…" aria-label="Search library">
+    <select id="subjectFilter" aria-label="Filter by subject"><option value="">All subjects</option></select>
+    <select id="statusFilter" aria-label="Filter by status"><option value="">All statuses</option><option>Inbox</option><option>Processed</option><option>To revise</option><option>Reviewed</option></select>
+    <button id="newBtn">＋ Add video</button>
+  </section>
+  <section class="layout">
+    <div>
+      <div class="section-heading"><h2>Your library</h2><span id="resultCount">0 entries</span></div>
+      <div id="videoList" class="video-list"></div>
+      <div id="emptyState" class="empty"><div class="empty-icon">✚</div><h3>Your library starts here</h3><p>Add a Short link and capture the one idea you don't want to forget.</p><button id="emptyAdd">Add your first video</button></div>
+    </div>
+    <aside class="guide">
+      <h2>Quick capture</h2>
+      <p>While watching on your phone, use YouTube <b>Share → Copy link</b>, then add it here. On Android, you can also use your browser’s “Add to Home screen” option.</p>
+      <hr><h3>Recommended workflow</h3>
+      <ol><li>Capture the URL and one-line takeaway.</li><li>Process later: write 3–5 points in your own words.</li><li>Verify clinical facts against a trusted source.</li><li>Create 2–3 recall questions.</li><li>Review due entries and update the next review date.</li></ol>
+      <hr><h3>Data & sync</h3>
+      <p id="storageNote">This starter stores data in this browser on this device. Export backups regularly.</p>
+      <p class="small">For automatic phone–PC sync, connect a cloud database (instructions in README). Hosting this HTML alone does not sync records.</p>
+      <button id="sampleBtn" class="secondary full">Load example entries</button>
+    </aside>
+  </section>
+</main>
+<dialog id="editor">
+<form id="videoForm" method="dialog">
+  <div class="modal-head"><div><div class="eyebrow">VIDEO ENTRY</div><h2 id="formTitle">Add a Short</h2></div><button type="button" id="closeModal" class="icon-btn" aria-label="Close">✕</button></div>
+  <input type="hidden" id="entryId">
+  <div class="form-grid">
+    <label class="wide">Video title *<input id="title" required placeholder="e.g. Why JVP rises in cardiac tamponade"></label>
+    <label class="wide">YouTube URL *<input id="url" type="url" required placeholder="https://youtube.com/shorts/…"></label>
+    <label>Subject<select id="subject"><option>Medicine</option><option>Surgery</option><option>Obstetrics & Gynaecology</option><option>Pediatrics</option><option>Ophthalmology</option><option>ENT</option><option>Community Medicine</option><option>Pathology</option><option>Pharmacology</option><option>Microbiology</option><option>Forensic Medicine</option><option>Other</option></select></label>
+    <label>Topic<input id="topic" placeholder="e.g. Cardiology"></label>
+    <label>Creator / channel<input id="creator" placeholder="Channel name"></label>
+    <label>Priority<select id="priority"><option>High</option><option selected>Medium</option><option>Low</option></select></label>
+    <label>Status<select id="status"><option>Inbox</option><option>Processed</option><option>To revise</option><option>Reviewed</option></select></label>
+    <label>Next review<input id="reviewDate" type="date"></label>
+    <label class="wide">One-line takeaway<textarea id="takeaway" rows="2" placeholder="The single most important thing to remember…"></textarea></label>
+    <label class="wide">Key learning points<textarea id="keyPoints" rows="4" placeholder="• Point 1&#10;• Point 2&#10;• Point 3"></textarea></label>
+    <label class="wide">Mechanism / clinical reasoning<textarea id="reasoning" rows="3" placeholder="Why does it happen? Explain the pathophysiology…"></textarea></label>
+    <label class="wide">Exam pearls<textarea id="pearls" rows="3" placeholder="Cutoffs, criteria, viva points, common MCQ traps…"></textarea></label>
+    <label class="wide">Active recall questions<textarea id="questions" rows="3" placeholder="Q1: …&#10;Q2: …&#10;Q3: …"></textarea></label>
+    <label class="wide">Verification source / caveats<textarea id="source" rows="2" placeholder="Textbook, guideline, edition/date, or facts still to verify"></textarea></label>
+    <label class="wide">Tags (comma separated)<input id="tags" placeholder="viva, high-yield, mechanism"></label>
+  </div>
+  <p class="notice">Educational notes only. Verify diagnoses, drug doses, emergency steps and guideline-dependent facts with current authoritative sources.</p>
+  <div class="modal-actions"><button type="button" id="deleteBtn" class="danger hidden">Delete</button><span class="spacer"></span><button type="button" id="cancelBtn" class="secondary">Cancel</button><button type="submit">Save entry</button></div>
+</form>
+</dialog>
+<footer>MedShorts • Your knowledge, organized • Back up your data regularly</footer>
+<script src="app.js"></script>
+</body></html>

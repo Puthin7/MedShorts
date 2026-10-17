@@ -1,0 +1,9 @@
+{
+  "name": "MedShorts Medical Knowledge Base",
+  "short_name": "MedShorts",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f4f6f2",
+  "theme_color": "#10231d",
+  "icons": []
+}
